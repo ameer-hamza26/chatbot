@@ -62,7 +62,7 @@ ehthumbs.db
 Thumbs.db
 
 # Docker
-.dockerignore
+# Note: .dockerignore should be committed (it's a config file)
 
 # Jupyter Notebook
 .ipynb_checkpoints
