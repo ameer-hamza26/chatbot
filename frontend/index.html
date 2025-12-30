@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TKR Restaurant Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        body {
+            background-color: #f8f9fa;
+            color: #1f2937;
+        }
+
+        .typing-indicator span {
+            animation: blink 1.4s infinite;
+            animation-fill-mode: both;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes blink {
+            0%, 60%, 100% {
+                opacity: 0.3;
+            }
+            30% {
+                opacity: 1;
+            }
+        }
+
+        textarea {
+            resize: none;
+            overflow-y: hidden;
+        }
+
+        .message-content p:last-child {
+            margin-bottom: 0;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        #chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        #chat-messages::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 10px;
+        }
+
+        #chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af;
+        }
+
+        .sidebar-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .sidebar-scrollbar::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 10px;
+        }
+
+        .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af;
+        }
+
+        /* Voice Input Styles */
+        .mic-button {
+            transition: all 0.2s ease;
+        }
+
+        .mic-button.recording {
+            background: linear-gradient(to bottom right, #ef4444, #dc2626) !important;
+            animation: pulse-recording 1.5s ease-in-out infinite;
+        }
+
+        .mic-button.error {
+            background: linear-gradient(to bottom right, #f59e0b, #d97706) !important;
+        }
+
+        @keyframes pulse-recording {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            }
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+            }
+        }
+
+        .mic-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .voice-status {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 8px;
+            padding: 6px 12px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 8px;
+            font-size: 12px;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .voice-status.show {
+            opacity: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="flex h-screen bg-white">
+        <!-- Sidebar -->
+        <div class="w-64 bg-white border-r border-gray-200 flex flex-col hidden md:flex">
+            <div class="p-3 border-b border-gray-200">
+                <button id="new-chat-btn"
+                    class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors duration-200 text-gray-700 shadow-sm hover:shadow">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                    </svg>
+                    <span class="text-sm font-medium">New chat</span>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-2 sidebar-scrollbar">
+                <div class="px-3 py-2 text-gray-500 text-xs uppercase tracking-wider font-semibold">Today</div>
+                <div class="space-y-1 mt-1">
+                    <div class="px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-100 rounded-lg cursor-pointer truncate transition-colors">
+                        TKR Restaurant Guide</div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-gray-200 bg-gray-50">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center text-xs font-semibold text-white shadow-sm">
+                        TKR
+                    </div>
+                    <span class="text-sm font-medium text-gray-700">Restaurant Assistant</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col bg-white">
+            <!-- Chat Messages -->
+            <div id="chat-messages" class="flex-1 overflow-y-auto bg-white">
+                <div class="max-w-4xl mx-auto px-4 py-8">
+                    <!-- Welcome Section -->
+                    <div id="welcome-section" class="flex flex-col items-center justify-center text-center py-20">
+                        <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
+                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                                <path
+                                    d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z"
+                                    stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                        </div>
+                        <h1 class="text-4xl font-semibold text-gray-900 mb-3">How can I help you today?</h1>
+                        <p class="text-gray-500 text-base">Ask me anything about TKR Restaurant</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="border-t border-gray-200 bg-white">
+                <div class="max-w-4xl mx-auto px-4 py-5">
+                    <form id="chat-form" class="relative">
+                        <div
+                            class="relative flex items-end bg-white border-2 border-gray-200 rounded-2xl hover:border-gray-300 focus-within:border-purple-500 transition-all duration-200 shadow-sm">
+                            <textarea id="user-input" rows="1" placeholder="Message Restaurant Assistant..."
+                                class="flex-1 px-5 py-4 bg-transparent border-none outline-none resize-none max-h-32 text-gray-900 placeholder-gray-400 text-base"></textarea>
+                            <div class="relative flex items-center gap-1">
+                                <button type="button" id="mic-button" 
+                                    class="mic-button m-2 p-2.5 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all duration-200 shadow-sm hover:shadow-md"
+                                    title="Click to start voice input">
+                                    <svg id="mic-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                        <line x1="12" y1="19" x2="12" y2="23"></line>
+                                        <line x1="8" y1="23" x2="16" y2="23"></line>
+                                    </svg>
+                                    <div id="voice-status" class="voice-status">Listening...</div>
+                                </button>
+                                <button type="submit" id="send-button" disabled
+                                    class="m-2 p-2.5 rounded-xl bg-gray-100 text-gray-400 disabled:bg-gray-100 disabled:text-gray-400 enabled:bg-gradient-to-br enabled:from-purple-500 enabled:to-indigo-600 enabled:text-white enabled:hover:from-purple-600 enabled:hover:to-indigo-700 transition-all duration-200 shadow-sm enabled:shadow-md">
+                                    <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
+                                        <path
+                                            d="M.5 1.163A1 1 0 0 1 1.97.28l12.868 6.837a1 1 0 0 1 0 1.766L1.969 15.72A1 1 0 0 1 .5 14.836V10.33a1 1 0 0 1 .816-.983L8.5 8 1.316 6.653A1 1 0 0 1 .5 5.67V1.163Z"
+                                            fill="currentColor" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                    <p class="text-xs text-gray-400 text-center mt-3">Restaurant Assistant can make mistakes. Check important
+                        info.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const chatMessages = document.getElementById('chat-messages');
+        let welcomeSection = document.getElementById('welcome-section');
+        const newChatBtn = document.getElementById('new-chat-btn');
+        const API_CHAT_ENDPOINT = '/api/chat';
+
+        // Voice Recognition Class
+        class VoiceRecognition {
+            constructor() {
+                this.recognition = null;
+                this.isListening = false;
+                this.finalTranscript = '';
+                this.interimTranscript = '';
+                this.micButton = document.getElementById('mic-button');
+                this.voiceStatus = document.getElementById('voice-status');
+                this.isSupported = this.checkSupport();
+                
+                if (this.isSupported) {
+                    this.initRecognition();
+                    this.setupEventListeners();
+                } else {
+                    this.disableVoiceInput();
+                }
+            }
+
+            checkSupport() {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                return SpeechRecognition !== undefined;
+            }
+
+            initRecognition() {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                this.recognition = new SpeechRecognition();
+                
+                this.recognition.continuous = true;
+                this.recognition.interimResults = true;
+                this.recognition.lang = 'en-US';
+
+                this.recognition.onstart = () => {
+                    this.isListening = true;
+                    this.finalTranscript = '';
+                    this.interimTranscript = '';
+                    this.updateUI('listening');
+                };
+
+                this.recognition.onresult = (event) => {
+                    let interim = '';
+                    let final = '';
+
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcript = event.results[i][0].transcript;
+                        if (event.results[i].isFinal) {
+                            final += transcript + ' ';
+                        } else {
+                            interim += transcript;
+                        }
+                    }
+
+                    this.finalTranscript += final;
+                    this.interimTranscript = interim;
+                    
+                    // Update textarea with both final and interim results
+                    userInput.value = this.finalTranscript + this.interimTranscript;
+                    userInput.style.height = 'auto';
+                    const newHeight = Math.min(userInput.scrollHeight, 128);
+                    userInput.style.height = newHeight + 'px';
+                    
+                    // Enable send button if there's text
+                    sendButton.disabled = userInput.value.trim() === '';
+                };
+
+                this.recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    this.handleError(event.error);
+                };
+
+                this.recognition.onend = () => {
+                    this.isListening = false;
+                    this.updateUI('idle');
+                    
+                    // If we have a final transcript, optionally auto-submit
+                    if (this.finalTranscript.trim()) {
+                        // User can edit before submitting, or we can auto-submit
+                        // For now, we'll let user manually submit
+                    }
+                };
+            }
+
+            handleError(error) {
+                this.isListening = false;
+                this.updateUI('idle');
+                
+                let errorMessage = 'Voice input error. Please try again.';
+                
+                switch (error) {
+                    case 'no-speech':
+                        errorMessage = 'No speech detected. Please try again.';
+                        break;
+                    case 'audio-capture':
+                        errorMessage = 'Microphone not found. Please check your microphone.';
+                        this.updateUI('error');
+                        break;
+                    case 'not-allowed':
+                        errorMessage = 'Microphone permission denied. Please allow microphone access.';
+                        this.updateUI('error');
+                        break;
+                    case 'network':
+                        errorMessage = 'Network error. Please check your connection.';
+                        break;
+                    case 'aborted':
+                        // User stopped recording, not really an error
+                        return;
+                    default:
+                        errorMessage = `Voice input error: ${error}`;
+                }
+                
+                // Show error message briefly
+                this.showStatus(errorMessage, 3000);
+            }
+
+            setupEventListeners() {
+                this.micButton.addEventListener('click', () => {
+                    if (this.isListening) {
+                        this.stop();
+                    } else {
+                        this.start();
+                    }
+                });
+            }
+
+            start() {
+                if (!this.recognition) return;
+                
+                try {
+                    this.finalTranscript = '';
+                    this.interimTranscript = '';
+                    userInput.value = '';
+                    this.recognition.start();
+                } catch (error) {
+                    console.error('Error starting recognition:', error);
+                    this.handleError('start-failed');
+                }
+            }
+
+            stop() {
+                if (this.recognition && this.isListening) {
+                    this.recognition.stop();
+                }
+            }
+
+            updateUI(state) {
+                switch (state) {
+                    case 'listening':
+                        this.micButton.classList.add('recording');
+                        this.micButton.classList.remove('error');
+                        this.micButton.title = 'Click to stop recording';
+                        this.showStatus('Listening...', 0);
+                        break;
+                    case 'error':
+                        this.micButton.classList.add('error');
+                        this.micButton.classList.remove('recording');
+                        this.micButton.title = 'Voice input error. Click to try again.';
+                        break;
+                    case 'idle':
+                    default:
+                        this.micButton.classList.remove('recording', 'error');
+                        this.micButton.title = 'Click to start voice input';
+                        this.hideStatus();
+                        break;
+                }
+            }
+
+            showStatus(message, duration = 0) {
+                if (this.voiceStatus) {
+                    this.voiceStatus.textContent = message;
+                    this.voiceStatus.classList.add('show');
+                    
+                    if (duration > 0) {
+                        setTimeout(() => {
+                            this.hideStatus();
+                        }, duration);
+                    }
+                }
+            }
+
+            hideStatus() {
+                if (this.voiceStatus) {
+                    this.voiceStatus.classList.remove('show');
+                }
+            }
+
+            disableVoiceInput() {
+                this.micButton.disabled = true;
+                this.micButton.title = 'Voice input not supported in this browser';
+                this.micButton.style.opacity = '0.5';
+            }
+        }
+
+        // Initialize voice recognition
+        let voiceRecognition = null;
+        if (window.SpeechRecognition || window.webkitSpeechRecognition) {
+            voiceRecognition = new VoiceRecognition();
+        } else {
+            // Hide microphone button if not supported
+            const micButton = document.getElementById('mic-button');
+            if (micButton) {
+                micButton.style.display = 'none';
+            }
+        }
+
+        // Auto-resize textarea
+        userInput.addEventListener('input', function () {
+            this.style.height = 'auto';
+            const newHeight = Math.min(this.scrollHeight, 128);
+            this.style.height = newHeight + 'px';
+            sendButton.disabled = this.value.trim() === '';
+        });
+
+        // Handle form submission
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Stop voice recognition if active
+            if (voiceRecognition && voiceRecognition.isListening) {
+                voiceRecognition.stop();
+            }
+
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            // Hide welcome section
+            if (welcomeSection) {
+                welcomeSection.style.display = 'none';
+            }
+
+            // Add user message
+            addMessage(message, 'user');
+
+            // Clear input
+            userInput.value = '';
+            userInput.style.height = 'auto';
+            sendButton.disabled = true;
+
+            // Show typing indicator
+            showTypingIndicator();
+
+            try {
+                const response = await fetch(API_CHAT_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to get response');
+                }
+
+                const data = await response.json();
+                hideTypingIndicator();
+                addMessage(data.response, 'bot');
+            } catch (error) {
+                console.error('Error:', error);
+                hideTypingIndicator();
+                addMessage('Sorry, I encountered an error. Please check if the backend is running.', 'bot');
+            }
+        });
+
+        // New chat button
+        if (newChatBtn) {
+            newChatBtn.addEventListener('click', () => {
+                const messagesContainer = chatMessages.querySelector('.max-w-4xl');
+                messagesContainer.innerHTML = `
+                    <div id="welcome-section" class="flex flex-col items-center justify-center text-center py-20">
+                        <div class="w-20 h-20 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
+                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                                <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <h1 class="text-4xl font-semibold text-gray-900 mb-3">How can I help you today?</h1>
+                        <p class="text-gray-500 text-base">Ask me anything about TKR Restaurant</p>
+                    </div>
+                `;
+                welcomeSection = document.getElementById('welcome-section');
+                userInput.value = '';
+                userInput.style.height = 'auto';
+                sendButton.disabled = true;
+                userInput.focus();
+
+                // Clear history in backend
+                fetch('/api/clear-chat', { method: 'POST' }).catch(err => console.error('Error clearing chat:', err));
+            });
+        }
+
+        function addMessage(text, type) {
+            const messagesContainer = chatMessages.querySelector('.max-w-4xl');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex gap-4 mb-8 fade-in ${type === 'user' ? 'justify-end' : ''}`;
+
+            if (type === 'bot') {
+                // Basic Markdown-like formatting for bot responses
+                const formattedText = text
+                    .replace(/\n/g, '<br>')
+                    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                    .replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+                messageDiv.innerHTML = `
+                    <div class="flex gap-4 max-w-full w-full">
+                        <div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                                <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="prose prose-sm max-w-none">
+                                <div class="text-gray-900 leading-relaxed text-base whitespace-pre-wrap">${formattedText}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                messageDiv.innerHTML = `
+                    <div class="flex gap-4 max-w-full w-full justify-end">
+                        <div class="flex-1 min-w-0 flex justify-end">
+                            <div class="bg-gray-100 text-gray-900 px-5 py-3.5 rounded-2xl rounded-tr-sm max-w-2xl shadow-sm">
+                                <p class="text-base leading-relaxed whitespace-pre-wrap">${text}</p>
+                            </div>
+                        </div>
+                        <div class="flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <circle cx="12" cy="7" r="4" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                    </div>
+                `;
+            }
+
+            messagesContainer.appendChild(messageDiv);
+            chatMessages.scrollTo({
+                top: chatMessages.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+
+        function showTypingIndicator() {
+            const messagesContainer = chatMessages.querySelector('.max-w-4xl');
+            const indicator = document.createElement('div');
+            indicator.id = 'typing-indicator';
+            indicator.className = 'flex gap-4 mb-8';
+            indicator.innerHTML = `
+                <div class="flex gap-4 max-w-full w-full">
+                    <div class="flex-shrink-0 w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                            <path d="M21 15C21 15.5304 20.7893 16.0391 20.4142 16.4142C20.0391 16.7893 19.5304 17 19 17H7L3 21V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V15Z" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div class="flex items-center gap-1.5 px-5 py-3.5 bg-gray-50 border border-gray-200 rounded-2xl typing-indicator shadow-sm">
+                        <span class="w-2 h-2 bg-gray-400 rounded-full"></span>
+                        <span class="w-2 h-2 bg-gray-400 rounded-full"></span>
+                        <span class="w-2 h-2 bg-gray-400 rounded-full"></span>
+                    </div>
+                </div>
+            `;
+            messagesContainer.appendChild(indicator);
+            chatMessages.scrollTo({
+                top: chatMessages.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) indicator.remove();
+        }
+
+        // Handle Enter key
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                // Stop voice recognition if active
+                if (voiceRecognition && voiceRecognition.isListening) {
+                    voiceRecognition.stop();
+                }
+                if (userInput.value.trim()) {
+                    chatForm.dispatchEvent(new Event('submit'));
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag-chatbot-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount vector_db directory to persist data
+      - ./vector_db:/app/vector_db
+      # Mount .env file for environment variables
+      - ./.env:/app/.env
+    environment:
+      # You can also set environment variables here instead of .env file
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+
+
